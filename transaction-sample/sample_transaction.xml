@@ -1,0 +1,177 @@
+﻿<posxmlapplication xmlns="http://tempuri.org/posxml.xsd">
+<!-- This code presents a sample transaction between POS and ruby server using posxml and WALK framework -->
+<!-- Developed by WALK team -->
+	<page name="main">
+		<!-- VARIABLES-->
+		<integervariable value="0" variable="iNumMenu"/>
+		<integervariable value="0" variable="iNumSaleValue"/>
+		<stringvariable value="" variable="sNumCard"/>
+		<stringvariable value="" variable="sNumPass"/>
+		<stringvariable value="" variable="sBuffer"/>
+		<stringvariable value="" variable="sAux"/>
+		<stringvariable value="" variable="sAccepted"/>
+		<stringvariable value="" variable="sMessage"/>
+		<stringvariable value="" variable="sAuthorizeNumber"/>
+		
+		<!-- CONFIGURATION -->
+		<editfile filename="config.dat" key="withssl" value="0"/>
+		<editfile filename="config.dat" key="myip" value="0.0.0.0"/>
+		<editfile filename="config.dat" key="mygateway" value="0.0.0.0"/>
+		<editfile filename="config.dat" key="dnsprimario" value="0.0.0.0"/>
+		<editfile filename="config.dat" key="dnssecundario" value="0.0.0.0"/>
+		<editfile filename="config.dat" key="subnet" value="0.0.0.0"/>
+		<editfile filename="config.dat" key="uclmedia" value="ETHERNET"/>
+		<!-- <editfile filename="config.dat" key="iphost" value="192.168.0.188"/> -->
+		<!-- <editfile filename="config.dat" key="portahost" value="800"/> -->
+		<editfile filename="config.dat" key="uclprotocol" value="TCP"/>
+		<editfile filename="config.dat" key="autooffmodem" value="0"/>
+		
+		<!-- OPTIONS -->
+		<menu options="OPTIONS:\\1 - CREDIT\2 - DEBIT" variable="$(iNumMenu)"/>
+		
+		<cleandisplay/>
+		<!-- request the sale value -->
+		<while operator="equalto" value="0" variable="$(iNumSaleValue)">
+			<inputmoney column="0" line="0" message="SALE VALUE:" variable="$(iNumSaleValue)"/>
+		</while>
+		<!-- set card number for test -->
+		<callfunction name="fSetNumCard"/>
+		<!-- if menu is equal to 2 (Debit), request the account password -->
+		<if operator="equalto" value="2" variable="$(iNumMenu)">
+			<integervariable value="0" variable="iNumPasswordLength"/>
+			<while operator="lessthan" value="4" variable="$(iNumPasswordLength)">
+				<inputformat column="0" line="2" format="****" variable="$(sNumPass)" message="PASSWORD:"/>
+				<string.length value="$(sNumPass)" variablereturn="$(iNumPasswordLength)"/>
+			</while>	
+		</if>
+		
+		<!-- CALL FUNCTIONS -->
+		<!-- Convert string to hexa before send to server -->
+		<callfunction name="fCryptString"/>
+		<!-- Send string to server and start transaction -->
+		<callfunction name="fSendBuffer"/>
+		<!-- Display results -->
+		<callfunction name="fDisplayResult"/>
+		
+		<shutdownmodem/>
+		
+		<!-- FUNCTIONS -->
+		<!-- Start transaction -->
+		<function name="fSendBuffer"> 
+			<integervariable value="0" variable="iNumReturn"/>
+			<integervariable value="0" variable="iNumSizeBuffer"/>
+			<integervariable value="0" variable="iNumByteReceive"/>
+			<string.length value="$(sBuffer)" variablereturn="$(iNumSizeBuffer)"/>
+			<!-- connection test -->
+			<cleandisplay/>
+			<display column="3" line="1" message="CONNECTING..."/>
+			<preconnect variablestatus="$(iNumReturn)"/>
+			
+			<!-- send information to server -->
+			<display column="3" line="1" message="SENDING..."/>
+			<preconnect variablestatus="$(iNumReturn)"/>
+			<network.send buffer="$(sBuffer)" size="$(iNumSizeBuffer)" variablereturn="$(iNumReturn)" />
+						
+			<!-- if return is equal to 1 then try to get the server information -->
+			<if operator="equalto" value="1" variable="$(iNumReturn)">
+				<stringvariable value="" variable="sBuffer"/>
+				
+				<display column="3" line="1" message="RECEIVING..."/>
+				<preconnect variablestatus="$(iNumReturn)"/>
+				<network.receive maxsize="1024" variablebuffer="$(sBuffer)" variablereceivedbytes="$(iNumByteReceive)" variablereturn="$(iNumReturn)" />
+				
+				<if operator="equalto" value="1" variable="$(iNumReturn)">
+					<!-- convert hexadecimal to string before display results -->
+					<callfunction name="fDecryptString"/>
+					<callfunction name="fPrintResult"/>
+				<else/>
+					<!-- failed to receive information from server -->
+					<stringvariable value="FAILED TO RECEIVE" variable="$(sMessage)"/>
+					<stringvariable value="DENIED" variable="$(sAccepted)"/>
+					<callfunction name="fPrintResult"/>
+				</if>
+			<else/>
+				<!-- failed to send information to server -->
+				<stringvariable value="DENIED" variable="$(sAccepted)"/>
+				<stringvariable value="FAILED TO CONNECT" variable="$(sMessage)"/>
+				<callfunction name="fPrintResult"/>
+			</if>
+		</function>
+				
+		<!-- Convert string to hexadecimal -->
+		<function name="fCryptString">
+			<!-- convert transaction number -->	
+			<inttostring variableinteger="$(iNumMenu)" variablestring="$(sAux)"/>
+			<joinstring firstvalue="$(sBuffer)" secondvalue="$(sAux)" variabledestination="$(sBuffer)"/>
+			<joinstring firstvalue="$(sBuffer)" secondvalue="#" variabledestination="$(sBuffer)"/>
+			<!-- convert sale value -->
+			<inttostring variableinteger="$(iNumSaleValue)" variablestring="$(sAux)"/>
+			<joinstring firstvalue="$(sBuffer)" secondvalue="$(sAux)" variabledestination="$(sBuffer)"/>
+			<joinstring firstvalue="$(sBuffer)" secondvalue="#" variabledestination="$(sBuffer)"/>
+			<!-- convert card number -->
+			<joinstring firstvalue="$(sBuffer)" secondvalue="$(sNumCard)" variabledestination="$(sBuffer)"/>
+			<!-- convert password -->
+			<if operator="equalto" value="2" variable="$(iNumMenu)">
+				<joinstring firstvalue="$(sBuffer)" secondvalue="#" variabledestination="$(sBuffer)"/>
+				<joinstring firstvalue="$(sBuffer)" secondvalue="$(sNumPass)" variabledestination="$(sBuffer)"/>
+			</if>
+			<!-- convert sbuffer to hex -->
+			<string.tohex string="$(sBuffer)" variablereturn="$(sBuffer)"/>
+		</function>
+		
+		<!-- Convert hexadecimal to string -->
+		<function name="fDecryptString">
+			<string.fromhex string="$(sBuffer)" variablereturn="$(sBuffer)"/>
+			<string.elementat delimiter="#" element_index="0" string="$(sBuffer)" variablereturn="$(sAccepted)"/>
+			<string.elementat delimiter="#" element_index="1" string="$(sBuffer)" variablereturn="$(sMessage)"/>
+			<string.elementat delimiter="#" element_index="2" string="$(sBuffer)" variablereturn="$(sAuthorizeNumber)"/>
+		</function>
+		
+		<!-- Print result of the transaction -->
+		<function name="fPrintResult">
+			<print message="------------------------------------"/>
+			<print message="--------- TEST TRANSACTION ---------"/>
+			<print message="------------------------------------"/>
+			<stringvariable value="" variable="$(sAux)"/>
+			<joinstring firstvalue="STATUS: " secondvalue="$(sAccepted)" variabledestination="$(sAux)"/>
+			<print message="$(sAux)"/>
+			<stringvariable value="" variable="$(sAux)"/>
+			<joinstring firstvalue="MESSAGE: " secondvalue="$(sMessage)" variabledestination="$(sAux)"/>
+			<print message="$(sAux)"/>
+			<stringvariable value="" variable="$(sAux)"/>
+			<joinstring firstvalue="PROTOCOL: " secondvalue="$(sAuthorizeNumber)" variabledestination="$(sAux)"/>
+			<print message="$(sAux)"/>
+			<print message="------------------------------------"/>
+			<paperfeed/>
+			<callfunction name="fDisplayResult"/>
+		</function>
+		
+		<!-- Display the results of the transaction -->
+		<function name="fDisplayResult">
+			<cleandisplay/>
+			<display column="0" line="0" message="TEST TRANSACTION"/>
+			
+			<stringvariable value="" variable="$(sAux)"/>
+			<joinstring firstvalue="STATUS: " secondvalue="$(sAccepted)" variabledestination="$(sAux)"/>
+			<display column="0" line="1" message="$(sAux)"/>
+			
+			<stringvariable value="" variable="$(sAux)"/>
+			<joinstring firstvalue="MESSAGE: " secondvalue="$(sMessage)" variabledestination="$(sAux)"/>
+			<display column="0" line="2" message="$(sAux)"/>
+			
+			<stringvariable value="" variable="$(sAux)"/>
+			<joinstring firstvalue="PROTOCOL: " secondvalue="$(sAuthorizeNumber)" variabledestination="$(sAux)"/>
+			<display column="0" line="3" message="$(sAux)"/>
+		</function>
+		
+		<!-- Set card number and display -->
+		<function name="fSetNumCard">
+			<cleandisplay/>
+			<display column="0" line="0" message="CARD NUMBER:"/>
+			<display column="0" line="1" message="1234-1234-1234-1234"/>
+			<display column="0" line="2" message="CONFIRM PRESS GREEN"/>
+			<stringvariable value="1234123412341234" variable="$(sNumCard)"/>
+			<waitkey/>
+		</function>
+	</page>
+</posxmlapplication>
