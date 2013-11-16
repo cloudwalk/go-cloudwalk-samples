@@ -1,5 +1,6 @@
 go-cloudwalk-samples
 ====================
+[![Build Status](https://drone.io/github.com/danielvargas/go-cloudwalk-samples/status.png)](https://drone.io/github.com/danielvargas/go-cloudwalk-samples/latest)
 
 Some integration samples in Golang 
 
