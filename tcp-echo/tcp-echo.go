@@ -10,10 +10,11 @@ import (
 )
 
 var addr *string = flag.String("h", "0.0.0.0:2000", "address")
-var delay *int = flag.Int("d", 0, "delay in secs to process POST")
+var delay *int = flag.Int("d", 0, "delay in secs to process buffer")
 var random *int = flag.Int("r", 0, "random delay range, -d must be 0 or not setted")
 
 func main() {
+	flag.Parse()
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", *addr)
 	checkError(err)
 
