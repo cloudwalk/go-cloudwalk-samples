@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# /etc/init.d/auth_server
+ 
+case "$1" in
+    start)
+        echo "Iniciando serviço..."
+        # comando para iniciar o serviço
+        nohup /opt/auth_server &
+        echo "OK"
+        ;;
+    
+    *)
+        echo "Operação inválida"
+        ;;
+esac
